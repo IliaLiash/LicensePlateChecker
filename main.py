@@ -5,7 +5,7 @@ from kivy.metrics import dp
 import random
 import string
 from kivymd.uix.list import ThreeLineListItem
-from paddle_test import paddle_ocr_recognition_img
+from paddle_test import put_boxes_opencv
 from kivymd.uix.menu import MDDropdownMenu
 
 
@@ -61,7 +61,7 @@ ScreenManager:
             
             
             MDBottomNavigationItem:
-                name: 'image'
+                name: 'detection'
                 text: 'Detection'
                 icon: 'text-recognition'
                 on_tab_press: print('Detected image')     
@@ -70,30 +70,6 @@ ScreenManager:
                     FitImage:
                         source: './result.jpg'                    
             
-            
-            MDBottomNavigationItem:
-                name: 'history_nav'
-                text: 'History'
-                icon: 'history'
-                on_tab_press: print('Entering HistoryList')
-
-                HistoryList:
-                    name: 'history'
-
-            MDBottomNavigationItem:
-                name: 'notes'
-                text: 'Notes'
-                icon: 'note-text-outline'
-                on_tab_press: app.call_history_list()     
-
-                Notes:
-                    name: 'last_winner'  
-
-                    ScrollView:
-                        MDList:
-                            theme_text_color: "Custom"
-                            id: container
-                            
             MDBottomNavigationItem:
                 name: 'search'
                 text: 'Search'
@@ -149,7 +125,28 @@ ScreenManager:
                     #     pos_hint: {'center_x': .75, 'center_y': .75}  
                     #     on_release: app.clear_image()
             
-                      
+            MDBottomNavigationItem:
+                name: 'history_nav'
+                text: 'History'
+                icon: 'history'
+                on_tab_press: print('Entering HistoryList')
+
+                HistoryList:
+                    name: 'history'
+
+             MDBottomNavigationItem:
+                name: 'notes'
+                text: 'Notes'
+                icon: 'note-text-outline'
+                on_tab_press: app.call_history_list()     
+
+                Notes:
+                    name: 'last_winner'  
+
+                    ScrollView:
+                        MDList:
+                            theme_text_color: "Custom"
+                            id: container
 '''
 
 
@@ -210,7 +207,7 @@ class TestChecker(MDApp):
         self.root.current = 'main_screen'
 
     def get_plate_number(self):
-        recognition_result = paddle_ocr_recognition_img("temp_plate.png")
+        recognition_result = put_boxes_opencv(img="temp_plate.png")
         filtered_result = [res for res in recognition_result if len(res) >= 1]
 
         if len(filtered_result) > 0:
@@ -256,6 +253,9 @@ class TestChecker(MDApp):
     def check_plate_number(self):
         pass
 
+    def write_history_log(self):
+        pass
+
     def clear_image(self):
         if self.root.get_screen('main_screen').ids.img.source == '':
             self.root.get_screen('main_screen').ids.plate_hide_button.text = 'Hide results'
@@ -270,7 +270,7 @@ class TestChecker(MDApp):
         camera = self.root.get_screen('main_screen').ids['camera']
         camera.export_to_png("temp_plate.png")
         self.get_plate_number()
-        self.change_screen_item('search')
+        self.change_screen_item('detection')
 
 
 if __name__ == "__main__":
