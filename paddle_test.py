@@ -55,7 +55,8 @@ def paddle_ocr_recognition_video(video_source='./plates/vid.mp4'):
         cv2.waitKey(10)
 
 
-def put_boxes_opencv(paddle_data=paddle_ocr_recognition_img(), img='temp_plate_test.png'):
+def put_boxes_opencv(img='temp_plate_test.png'):
+    paddle_data = paddle_ocr_recognition_img()
     image = cv2.imread(img)
     font = cv2.FONT_HERSHEY_SIMPLEX
     org = (50, 50)

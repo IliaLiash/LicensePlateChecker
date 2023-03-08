@@ -1,12 +1,11 @@
 from kivymd.app import MDApp
-from kivy.uix.screenmanager import Screen, ScreenManager
+from kivy.uix.screenmanager import Screen
 from kivy.lang import Builder
 from kivy.metrics import dp
-import random
-import string
-from kivymd.uix.list import ThreeLineListItem
+from kivymd.uix.list import TwoLineListItem
 from paddle_test import put_boxes_opencv
 from kivymd.uix.menu import MDDropdownMenu
+from db_request import get_plate_status
 
 
 KV = '''
@@ -26,7 +25,7 @@ ScreenManager:
 
         MDTopAppBar:
             title: f'Test Checker'
-            left_action_items: [["menu", lambda x: print('Entering menu')]]
+            # left_action_items: [["menu", lambda x: print('Entering menu')]]
 
         MDBottomNavigation:
             id: bottom_nav
@@ -64,7 +63,7 @@ ScreenManager:
                 name: 'detection'
                 text: 'Detection'
                 icon: 'text-recognition'
-                on_tab_press: print('Detected image')     
+                # on_tab_press: print('Detected image')     
 
                 DetectedImage:
                     FitImage:
@@ -91,18 +90,12 @@ ScreenManager:
                         pos_hint: {'center_y':0.5}
                         adaptive_height: True
                         spacing: 20                
-                                                                        
+
                         MDRaisedButton:
-                            text: 'CHECK NUMBER'
-                            on_press: app.get_plate_number()
-                            pos_hint: {'center_x': .5, 'center_y': .5}  
-                            
-                        MDRaisedButton:
-                            id: select_recognition_button
-                            text: 'SELECT DETECTION'
-                            pos_hint: {'center_x': .75, 'center_y': .75}  
-                            on_release: app.menu.open() if app.menu else app.create_fake_menu()
-                        
+                            text: 'NEW CAPTURE'
+                            on_press: app.change_screen_item('camera')      
+                            pos_hint: {'center_x': .5, 'center_y': .75}  
+
                         MDTextField:
                             id: plate_label_label
                             hint_text: "Enter the vehicle plate number..."
@@ -113,12 +106,31 @@ ScreenManager:
                             halign: 'center'
                             size_hint_x: None
                             width: 300                            
-                        
+
                         MDRaisedButton:
-                            text: 'NEW CAPTURE'
-                            on_press: app.change_screen_item('camera')      
-                            pos_hint: {'center_x': .5, 'center_y': .75}  
+                            id: select_recognition_button
+                            text: 'SELECT DETECTION'
+                            pos_hint: {'center_x': .5, 'center_y': .5}
+                            md_bg_color: [0.255, 0.209, 0.82, 1]
+                            on_release: app.menu.open() if app.menu else app.create_fake_menu()
+
+                        MDRaisedButton:
+                            text: 'CHECK NUMBER'
+                            on_press: app.check_plate_number()
+                            pos_hint: {'center_x': .5, 'center_y': .5}  
+                            
+                        FitImage:
+                            id: result_png
+                            size_hint: None, None
+                            pos_hint: {'center_x': .5}  
+                            source: ''
                         
+                        MDLabel:
+                            id: result_label
+                            text: ''
+                            halign: "center"
+                            
+                                                    
                     # MDRaisedButton:
                     #     id: plate_hide_button
                     #     text: 'Hide plate'
@@ -134,15 +146,15 @@ ScreenManager:
                 HistoryList:
                     name: 'history'
 
-             MDBottomNavigationItem:
+            MDBottomNavigationItem:
                 name: 'notes'
                 text: 'Notes'
                 icon: 'note-text-outline'
                 on_tab_press: app.call_history_list()     
-
+    
                 Notes:
                     name: 'last_winner'  
-
+    
                     ScrollView:
                         MDList:
                             theme_text_color: "Custom"
@@ -178,28 +190,55 @@ class TestChecker(MDApp):
 
     def build(self):
         self.root = Builder.load_string(KV)
+        # self.root.get_screen('main_screen').ids.select_recognition_button.md_bg_color = [1, 1, 1, 1]
         return Builder.load_string(KV)
 
     def call_history_list(self):
-        plate_len = (7, 8)
-        for i in range(20):
-            plate_number = ''.join(random.choice(string.digits) for _ in range(random.choice(plate_len)))
-            plate_status = random.choice(('OK', 'OUT OF DATE'))
-            text_color = [.2, .4, .6, 1]
+        with open('history.csv') as csv:
+            for line in csv:
+                line = line.split(',')
+                plate_number = line[0]
+                plate_status = line[1].strip()
+                text_color = [.2, .4, .6, 1]
 
-            if len(plate_number) == 7:
-                text = '{}-{}-{}'.format(plate_number[:2], plate_number[2:5], plate_number[5:])
-            elif len(plate_number) == 8:
-                text = '{}-{}-{}'.format(plate_number[:3], plate_number[3:5], plate_number[5:])
-            else:
-                text = plate_number
+                if len(plate_number) == 7:
+                    text = '{}-{}-{}'.format(plate_number[:2], plate_number[2:5], plate_number[5:])
+                elif len(plate_number) == 8:
+                    text = '{}-{}-{}'.format(plate_number[:3], plate_number[3:5], plate_number[5:])
+                else:
+                    text = plate_number
 
-            self.root.get_screen('main_screen').ids.container.add_widget(
-                ThreeLineListItem(text=text,
-                                  secondary_text=plate_status,
-                                  tertiary_text="bla_bla_bla",
-                                  text_color=text_color)
-            )
+                self.root.get_screen('main_screen').ids.container.add_widget(
+                    TwoLineListItem(text=text,
+                                      secondary_text=plate_status,
+                                      # tertiary_text="bla_bla_bla",
+                                      text_color=text_color)
+                )
+
+    @staticmethod
+    def write_history_log(license_plate_number, status):
+        with open('history.csv', 'a') as csv:
+            csv.write(f"{license_plate_number}, {status}\n")
+
+    def check_plate_number(self):
+        self.plate_number = self.root.get_screen('main_screen').ids.plate_label_label.text
+        res = get_plate_status(self.plate_number)
+        if not res:
+            self.root.get_screen('main_screen').ids.result_label.text = 'Not Valid'
+            self.root.get_screen('main_screen').ids.result_png.source = 'status_bad.png'
+        elif res == 'Incorrect License number':
+            self.root.get_screen('main_screen').ids.result_label.text = 'Incorrect License number'
+            self.root.get_screen('main_screen').ids.result_png.source = 'question_face.png'
+        elif isinstance(res, str) and 'recycle' in res:
+            self.root.get_screen('main_screen').ids.result_label.text = res
+            self.root.get_screen('main_screen').ids.result_png.source = 'status_bad.png'
+        elif res:
+            self.root.get_screen('main_screen').ids.result_label.text = f'Valid, till {res}'
+            self.root.get_screen('main_screen').ids.result_png.source = 'status_ok.png'
+        else:
+            self.root.get_screen('main_screen').ids.result_label.text = str(res)
+        self.root.get_screen('main_screen').ids.result_png.reload()
+        self.write_history_log(str(self.plate_number), str(self.root.get_screen('main_screen').ids.result_label.text))
 
     def change_screen_item(self, nav_item):
         s = self.root.get_screen('main_screen')
@@ -209,6 +248,7 @@ class TestChecker(MDApp):
     def get_plate_number(self):
         recognition_result = put_boxes_opencv(img="temp_plate.png")
         filtered_result = [res for res in recognition_result if len(res) >= 1]
+        filtered_result.append('1777765')
 
         if len(filtered_result) > 0:
             menu_items = [
@@ -235,32 +275,28 @@ class TestChecker(MDApp):
         self.menu.dismiss()
 
     def create_fake_menu(self):
-        menu_items = [
-            {
-                "viewclass": "OneLineListItem",
-                # "icon": "git",
-                "height": dp(40),
-                "text": f"No captured data"
-            }]
+        try:
+            self.get_plate_number()
+        except:
+            menu_items = [
+                {
+                    "viewclass": "OneLineListItem",
+                    # "icon": "git",
+                    "height": dp(40),
+                    "text": f"No captured data"
+                }]
 
-        self.menu = MDDropdownMenu(
-            caller=self.root.get_screen('main_screen').ids.select_recognition_button,
-            items=menu_items,
-            position="bottom",
-            width_mult=4,
-        )
-
-    def check_plate_number(self):
-        pass
-
-    def write_history_log(self):
-        pass
+            self.menu = MDDropdownMenu(
+                caller=self.root.get_screen('main_screen').ids.select_recognition_button,
+                items=menu_items,
+                position="bottom",
+                width_mult=4,
+            )
 
     def clear_image(self):
         if self.root.get_screen('main_screen').ids.img.source == '':
             self.root.get_screen('main_screen').ids.plate_hide_button.text = 'Hide results'
             self.root.get_screen('main_screen').ids.img.source = './result.jpg'
-
         else:
             self.root.get_screen('main_screen').ids.img.source = ''
             self.root.get_screen('main_screen').ids.plate_hide_button.text = 'Show results'
