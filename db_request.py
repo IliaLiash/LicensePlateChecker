@@ -7,14 +7,15 @@ from datetime import datetime
 def filter_licence_number(license_number):
     filtered_number = ''.join(filter(str.isdigit, license_number))
     if 7 <= len(filtered_number) <= 8:
-        return True
+        return filtered_number
     return False
 
 
 def get_plate_status(license_number='3839065'):
     try:
-        if filter_licence_number(license_number):
-            r = requests.get(f"https://www.find-car.co.il/car/private/{license_number}")
+        filtered_license = filter_licence_number(license_number)
+        if filtered_license:
+            r = requests.get(f"https://www.find-car.co.il/car/private/{filtered_license}")
             soup = BeautifulSoup(r.text, 'html.parser')
             divs = soup.find("div", {'class': re.compile(r"^important_details$")}, partial=False)
             divs = [div.text for div in divs][3]
@@ -33,4 +34,4 @@ def get_plate_status(license_number='3839065'):
 
 
 if __name__ == "__main__":
-    print(get_plate_status())
+    print(get_plate_status('493:47-601'))

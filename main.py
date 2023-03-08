@@ -66,6 +66,7 @@ ScreenManager:
                 # on_tab_press: print('Detected image')     
 
                 DetectedImage:
+                    id: detected_image
                     FitImage:
                         source: './result.jpg'                    
             
@@ -246,9 +247,9 @@ class TestChecker(MDApp):
         self.root.current = 'main_screen'
 
     def get_plate_number(self):
-        recognition_result = put_boxes_opencv(img="temp_plate.png")
-        filtered_result = [res for res in recognition_result if len(res) >= 1]
-        filtered_result.append('1777765')
+        recognition_result = put_boxes_opencv(img="./plates/close.jpg")
+        filtered_result = [res for res in recognition_result if len(res) >= 7]
+        filtered_result = [''.join(filter(str.isdigit, license_number)) for license_number in filtered_result]
 
         if len(filtered_result) > 0:
             menu_items = [
@@ -269,6 +270,7 @@ class TestChecker(MDApp):
 
         self.plate_number = ', '.join(filtered_result) if filtered_result else 'Plate number not detected'
         self.root.get_screen('main_screen').ids.plate_label_label.text = self.plate_number
+        self.root.get_screen('main_screen').ids.detected_image.reload()
 
     def set_item(self, text__item):
         self.root.get_screen('main_screen').ids.plate_label_label.text = text__item

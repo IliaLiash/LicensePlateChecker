@@ -7,7 +7,7 @@ import numpy as np
 # to switch the language model in order.
 
 
-def paddle_ocr_recognition_img(img_path='./temp_plate.png'):
+def paddle_ocr_recognition_img(img_path='./plates/close.jpg'):
     ocr = PaddleOCR(use_angle_cls=True, lang='en')  # need to run only once to download and load model into memory
     result = ocr.ocr(img_path, cls=True)
     for idx in range(len(result)):
@@ -55,16 +55,19 @@ def paddle_ocr_recognition_video(video_source='./plates/vid.mp4'):
         cv2.waitKey(10)
 
 
-def put_boxes_opencv(img='temp_plate_test.png'):
+def put_boxes_opencv(img='./plates/close.jpg'):
     paddle_data = paddle_ocr_recognition_img()
     image = cv2.imread(img)
     font = cv2.FONT_HERSHEY_SIMPLEX
     org = (50, 50)
     fontScale = 1
+
+    paddle_data.sort(key=lambda x: x[2], reverse=True)
+
     for index, detection in enumerate(paddle_data, start=1):
         cv2.rectangle(image, tuple(map(int, detection[0][0])), tuple(map(int, detection[0][2])),
                       color=(255, 0, 0), thickness=2)
-        cv2.putText(image, f"{index}: {detection[1]} - {int(detection[2] * 100)}%", org, font, fontScale,
+        cv2.putText(image, f"{index}: {''.join(filter(str.isdigit, detection[1]))} - {int(detection[2] * 100)}%", org, font, fontScale,
                     color=(0, 255, 255), thickness=1)
         org = (org[0], org[1] + 50)
     cv2.imwrite('result.jpg', image)
