@@ -6,7 +6,7 @@ from kivymd.uix.list import TwoLineListItem
 from paddle_test import put_boxes_opencv
 from kivymd.uix.menu import MDDropdownMenu
 from db_request import get_plate_status
-
+from kivy.uix.textinput import TextInput
 
 KV = '''
 ScreenManager:
@@ -41,18 +41,18 @@ ScreenManager:
                         md_bg_color: [.119, .136, .153, 1]                            
                         # Camera:
                         #     id: camera
-                        #     resolution: (640, 480)
+                        #     resolution: (1280, 720)
                         #     allow_stretch: True
                         #     keep_ratio: True
                         #     play: True
+                        # ToggleButton:
+                        #     text: 'Play'
+                        #     size_hint_y: None
+                        #     height: '48dp'
+                        #     size_hint_y: None
+                        #     on_press: camera.play = not camera.play
+                        #     # on_press: app.capture()
                         ToggleButton:
-                            text: 'Play'
-                            size_hint_y: None
-                            height: '48dp'
-                            size_hint_y: None
-                            on_press: camera.play = not camera.play
-                            # on_press: app.capture()
-                        Button:
                             text: 'Capture'
                             size_hint_y: None
                             height: '48dp'
@@ -66,9 +66,19 @@ ScreenManager:
                 # on_tab_press: print('Detected image')     
 
                 DetectedImage:
-                    id: detected_image
                     FitImage:
-                        source: './result.jpg'                    
+                        id: detected_image
+                        source: './result.jpg'
+                        
+                MDRaisedButton:
+                    text: 'PROCEED'
+                    on_press: app.change_screen_item('search') 
+                    pos_hint: {'center_x': .93, 'center_y': .1}  
+                            
+                MDRaisedButton:
+                    text: 'BACK TO CAPTURE'
+                    on_press: app.change_screen_item('camera') 
+                    pos_hint: {'center_x': .1, 'center_y': .1}                     
             
             MDBottomNavigationItem:
                 name: 'search'
@@ -90,7 +100,8 @@ ScreenManager:
                         orientation: "vertical"
                         pos_hint: {'center_y':0.5}
                         adaptive_height: True
-                        spacing: 20                
+                        spacing: 20  
+                        padding: 20              
 
                         MDRaisedButton:
                             text: 'NEW CAPTURE'
@@ -142,24 +153,43 @@ ScreenManager:
                 name: 'history_nav'
                 text: 'History'
                 icon: 'history'
-                on_tab_press: print('Entering HistoryList')
+                on_tab_press: app.call_history_list()
 
                 HistoryList:
                     name: 'history'
+                    
+                    ScrollView:
+                        MDList:
+                            id: container
+                            theme_text_color: "Custom"
 
             MDBottomNavigationItem:
                 name: 'notes'
                 text: 'Notes'
                 icon: 'note-text-outline'
-                on_tab_press: app.call_history_list()     
-    
-                Notes:
-                    name: 'last_winner'  
-    
-                    ScrollView:
-                        MDList:
-                            theme_text_color: "Custom"
-                            id: container
+                on_tab_press: app.pre_fill_notes()      
+                
+                MDBoxLayout:
+                    orientation: "vertical"
+                    pos_hint: {'center_y':0.5}
+                    # adaptive_height: True
+                    spacing: 20
+                    padding: 20     
+                               
+                    TextInput:
+                        id: notes_input
+                        hint_text:'Enter text'
+                        pos_hint: {'center_x': .5, 'center_y': .5}
+                        size_hint: 0.95, 0.5
+                        # on_text: app.process()  
+                        
+                    MDRaisedButton:
+                        text: 'SAVE'                       
+                        pos_hint: {'center_x': .5, 'center_y': .5} 
+                        md_bg_color: [0.255, 0.209, 0.82, 1]
+                        on_release: app.write_notes()   
+                        halign: 'center'
+                        size_hint_x: None
 '''
 
 
@@ -195,31 +225,54 @@ class TestChecker(MDApp):
         return Builder.load_string(KV)
 
     def call_history_list(self):
-        with open('history.csv') as csv:
-            for line in csv:
+        with open('history.csv', 'r') as csv:
+            lines = csv.readlines()
+            for index, line in reversed(list(enumerate(lines, start=1))):
                 line = line.split(',')
                 plate_number = line[0]
                 plate_status = line[1].strip()
                 text_color = [.2, .4, .6, 1]
 
                 if len(plate_number) == 7:
-                    text = '{}-{}-{}'.format(plate_number[:2], plate_number[2:5], plate_number[5:])
+                    text = '{}. {}-{}-{}'.format(index, plate_number[:2], plate_number[2:5], plate_number[5:])
                 elif len(plate_number) == 8:
-                    text = '{}-{}-{}'.format(plate_number[:3], plate_number[3:5], plate_number[5:])
+                    text = '{}. {}-{}-{}'.format(index, plate_number[:3], plate_number[3:5], plate_number[5:])
                 else:
-                    text = plate_number
+                    text = f'{index}. {plate_number}'
 
                 self.root.get_screen('main_screen').ids.container.add_widget(
                     TwoLineListItem(text=text,
-                                      secondary_text=plate_status,
-                                      # tertiary_text="bla_bla_bla",
-                                      text_color=text_color)
+                                    secondary_text=plate_status,
+                                    text_color=text_color),
+                )
+                self.root.get_screen('main_screen').ids.container.add_widget(
+                    TextInput(font_size=15,
+                              size_hint_y=None,
+                              height=30)
                 )
 
     @staticmethod
     def write_history_log(license_plate_number, status):
-        with open('history.csv', 'a') as csv:
-            csv.write(f"{license_plate_number}, {status}\n")
+        if status != 'Incorrect License number':
+            with open('history.csv', 'a', encoding='utf-8') as csv:
+                csv.write(f"{license_plate_number}, {status}\n")
+
+    def pre_fill_notes(self):
+        hint_text = ''
+
+        with open('notes.csv', 'r') as csv:
+            lines = csv.readlines()
+
+            for line in lines:
+                hint_text += line
+
+        self.root.get_screen('main_screen').ids.notes_input.text = hint_text
+        self.root.get_screen('main_screen').ids.notes_input.cursor = (0, 0)
+
+    def write_notes(self):
+        notes_text = self.root.get_screen('main_screen').ids.notes_input.text
+        with open('notes.csv', 'w', encoding='utf-8') as csv:
+            csv.write(f"{notes_text}")
 
     def check_plate_number(self):
         self.plate_number = self.root.get_screen('main_screen').ids.plate_label_label.text
@@ -230,11 +283,11 @@ class TestChecker(MDApp):
         elif res == 'Incorrect License number':
             self.root.get_screen('main_screen').ids.result_label.text = 'Incorrect License number'
             self.root.get_screen('main_screen').ids.result_png.source = 'question_face.png'
-        elif isinstance(res, str) and 'recycle' in res:
+        elif isinstance(res[0], str) and 'recycle' in res:
             self.root.get_screen('main_screen').ids.result_label.text = res
             self.root.get_screen('main_screen').ids.result_png.source = 'status_bad.png'
         elif res:
-            self.root.get_screen('main_screen').ids.result_label.text = f'Valid, till {res}'
+            self.root.get_screen('main_screen').ids.result_label.text = f'{res[1]}. Valid, till {res[0]}'
             self.root.get_screen('main_screen').ids.result_png.source = 'status_ok.png'
         else:
             self.root.get_screen('main_screen').ids.result_label.text = str(res)

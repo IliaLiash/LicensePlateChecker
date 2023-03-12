@@ -16,16 +16,18 @@ def get_plate_status(license_number='3839065'):
         filtered_license = filter_licence_number(license_number)
         if filtered_license:
             r = requests.get(f"https://www.find-car.co.il/car/private/{filtered_license}")
-            soup = BeautifulSoup(r.text, 'html.parser')
-            divs = soup.find("div", {'class': re.compile(r"^important_details$")}, partial=False)
-            divs = [div.text for div in divs][3]
-            span = soup.find(soup.find_all('span', {'class': 'bad'}), partial=False)
-            if 'תאריך הורדה' in str(span):
+            soup = BeautifulSoup(r.text, 'html.parser', from_encoding='utf-8')
+            license_status = soup.find("div", {'class': re.compile(r"^important_details$")}, partial=False)
+            license_status = [div.text for div in license_status][3]
+            recycled_status = soup.find(soup.find_all('span', {'class': 'bad'}), partial=False)
+            car_brand = soup.find('title').text.split('|')[1].strip()
+            car_brand = re.sub(r'[^A-Za-z0-9 ]+', '', car_brand)
+            if 'תאריך הורדה' in str(recycled_status):
                 return 'The vehicle was recycled'
             pattern = r'\d{2}.\d{2}.\d{4}'
-            license_expiry_date = datetime.strptime(re.findall(pattern, divs)[0], "%d/%m/%Y").date()
+            license_expiry_date = datetime.strptime(re.findall(pattern, license_status)[0], "%d/%m/%Y").date()
             if license_expiry_date >= datetime.now().date():
-                return license_expiry_date
+                return license_expiry_date, car_brand
             return False
         else:
             return 'Incorrect License number'
