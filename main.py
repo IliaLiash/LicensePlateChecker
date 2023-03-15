@@ -39,12 +39,12 @@ ScreenManager:
                     MDBoxLayout:
                         orientation: 'vertical'
                         md_bg_color: [.119, .136, .153, 1]                            
-                        # Camera:
-                        #     id: camera
-                        #     resolution: (1280, 720)
-                        #     allow_stretch: True
-                        #     keep_ratio: True
-                        #     play: True
+                        Camera:
+                            id: camera
+                            resolution: (1280, 720)
+                            allow_stretch: True
+                            keep_ratio: True
+                            play: True
                         # ToggleButton:
                         #     text: 'Play'
                         #     size_hint_y: None
